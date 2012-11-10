@@ -4,6 +4,11 @@ require_once("common-config.php");
 
 // Authentication scheme to be used for teams. The following methods
 // are supported:
+// COMBINED
+//   Use the computer's IP address to authenticate a team and then
+//   also give the oppertunity to login with user/password
+//   authentication. Also enables a button at the login screen to
+//   save the IP address for future logins.
 // IPADDRESS
 //   Use the computer's IP address to authenticate a team. This
 //   removes the hassle of logging in with user/pass, but requires
@@ -22,7 +27,7 @@ require_once("common-config.php");
 //   can be useful e.g. for a demo or testing environment. Define
 //   FIXED_TEAM to the team user to be used, e.g.:
 //   define('FIXED_TEAM', 'domjudge');
-define('AUTH_METHOD', 'PHP_SESSIONS');
+define('AUTH_METHOD', 'COMBINED');
 
 // Strict checking of team's IP addresses (when using the IPADDRESS
 // authentication method).
