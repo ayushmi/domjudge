@@ -30,10 +30,7 @@ function logged_in()
 		$teamdata = $DB->q('MAYBETUPLE SELECT * FROM team WHERE login = %s', $login);
 		break;
 
-	case 'IPADDRESS':
-		$teamdata = $DB->q('MAYBETUPLE SELECT * FROM team WHERE authtoken = %s', $ip);
-		break;
-
+	case 'COMBINED':
 	case 'PHP_SESSIONS':
 	case 'LDAP':
 		session_start();
@@ -41,6 +38,12 @@ function logged_in()
 			$teamdata = $DB->q('MAYBETUPLE SELECT * FROM team WHERE login = %s',
 			                   $_SESSION['teamid']);
 		}
+		
+		if ( AUTH_METHOD!='COMBINED' || !empty($teamdata) )
+			break;
+		
+	case 'IPADDRESS':
+		$teamdata = $DB->q('MAYBETUPLE SELECT * FROM team WHERE authtoken = %s', $ip);
 		break;
 
 	default:
@@ -67,6 +70,11 @@ function have_logout()
 	switch ( AUTH_METHOD ) {
 	case 'FIXED':        return FALSE;
 	case 'IPADDRESS':    return FALSE;
+	case 'COMBINED': 	 
+		if ( isset($_SESSION['teamid']) )
+			return TRUE;
+		else
+			return FALSE;
 	case 'PHP_SESSIONS': return TRUE;
 	case 'LDAP':         return TRUE;
 	}
@@ -92,6 +100,7 @@ function show_loginpage()
 	global $ip;
 
 	switch ( AUTH_METHOD ) {
+	case 'COMBINED':
 	case 'IPADDRESS':
 	case 'PHP_SESSIONS':
 	case 'LDAP':
@@ -115,6 +124,9 @@ Please supply team credentials below, or contact a staff member for assistance.
 <table>
 <tr><td><label for="login">Login:</label></td><td><input type="text" id="login" name="login" value="" size="15" maxlength="15" accesskey="l" /></td></tr>
 <tr><td><label for="passwd">Password:</label></td><td><input type="password" id="passwd" name="passwd" value="" size="15" maxlength="255" accesskey="p" /></td></tr>
+<?php if ( AUTH_METHOD=='COMBINED' ) { ?>
+<tr><td><input type="checkbox" id="saveip" name="saveip" value="true" accesskey="s" /></td><td><label for="saveip">Save IP for next login</label></td></tr>
+<?php } ?>
 <tr><td colspan="2" align="center"><input type="submit" value="Login" /></td></tr>
 </table>
 </form>
@@ -183,10 +195,12 @@ function do_login()
 	switch ( AUTH_METHOD ) {
 	// Generic authentication code for IPADDRESS and PHP_SESSIONS;
 	// some specializations are handled by if-statements.
+	case 'COMBINED':
 	case 'IPADDRESS':
 	case 'PHP_SESSIONS':
 		$user = trim($_POST['login']);
 		$pass = trim($_POST['passwd']);
+		$saveip = trim($_POST['saveip']);
 
 		$title = 'Authenticate user';
 		$menu = false;
@@ -207,12 +221,12 @@ function do_login()
 
 		$login = $teamdata['login'];
 
-		if ( AUTH_METHOD=='IPADDRESS' ) {
+		if ( AUTH_METHOD=='IPADDRESS' || (AUTH_METHOD=='COMBINED' && !empty($saveip)) ) {
 			$cnt = $DB->q('RETURNAFFECTED UPDATE team SET authtoken = %s
 			               WHERE login = %s', $ip, $login);
 			if ( $cnt != 1 ) error("cannot set IP for team '$login'");
 		}
-		if ( AUTH_METHOD=='PHP_SESSIONS' ) {
+		if ( AUTH_METHOD=='PHP_SESSIONS' || (AUTH_METHOD=='COMBINED' && empty($saveip)) ) {
 			session_start();
 			$_SESSION['teamid'] = $login;
 			auditlog('team', $login, 'logged in', $_SERVER['REMOTE_ADDR']);
@@ -265,6 +279,7 @@ function do_logout()
 	global $DB, $ip, $login, $teamdata;
 
 	switch ( AUTH_METHOD ) {
+	case 'COMBINED':
 	case 'PHP_SESSIONS':
 	case 'LDAP':
 		// Unset all of the session variables.
