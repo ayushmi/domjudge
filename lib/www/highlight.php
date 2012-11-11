@@ -71,6 +71,7 @@ function highlighter_init ()
 function highlight_geshi ($source, $ext)
 {
 	switch (strtolower($ext)) {
+	case 'cxx': $lang = 'cpp';     break;
 	case 'hs':  $lang = 'haskell'; break;
 	case 'pas': $lang = 'pascal';  break;
 	case 'pl':  $lang = 'perl';    break;
@@ -97,6 +98,7 @@ function highlight_geshi ($source, $ext)
 function highlight_texthighlighter ($source, $ext)
 {
 	switch (strtolower($ext)) {
+	case 'cxx':  $lang = 'cpp'; break;
 	case 'c':    $lang = 'cpp'; break;
 	case 'bash': $lang = 'sh';  break;
 	default:
