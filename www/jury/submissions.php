@@ -24,7 +24,8 @@ if ( isset($_REQUEST['view']) ) {
 
 require('init.php');
 $refresh = '15;url=submissions.php?' .
-	urlencode('view[' . $view . ']') . '=' . urlencode($viewtypes[$view]);
+	urlencode('view[' . $view . ']') . '=' . urlencode($viewtypes[$view]) .
+	(!empty($_REQUEST['categoryid']) ? '&categoryid=' . urlencode($_REQUEST['categoryid']) : '');
 $title = 'Submissions';
 
 // Set cookie of submission view type, expiry defaults to end of session.
@@ -37,14 +38,22 @@ require(LIBWWWDIR . '/header.php');
 echo "<h1>$title</h1>\n\n";
 
 $restrictions = array();
+if ( !empty($_REQUEST['categoryid']) ) $restrictions['categoryid'] = $_REQUEST['categoryid'];
 if ( $viewtypes[$view] == 'unverified' ) $restrictions['verified'] = 0;
 if ( $viewtypes[$view] == 'unjudged' ) $restrictions['judged'] = 0;
+
+//Get all available categories
+$categids = $DB->q('KEYVALUETABLE SELECT categoryid, name FROM team_category');
+$categids[''] = 'All';
+ksort($categids);
 
 echo addForm('submissions.php', 'get') . "<p>Show submissions:\n";
 for($i=0; $i<count($viewtypes); ++$i) {
 	echo addSubmit($viewtypes[$i], 'view['.$i.']', null, ($view != $i));
 }
-echo "</p>\n" . addEndForm();
+echo "</p><p>Show team category:\n" .
+     addSelect('categoryid', $categids,  @$restrictions['categoryid'], TRUE,  FALSE) .
+     addSubmit('filter'). "</p>\n". addEndForm();
 
 putSubmissions($cdata, $restrictions, ($viewtypes[$view] == 'newest' ? 50 : 0));
 

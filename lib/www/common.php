@@ -94,7 +94,8 @@ function putSubmissions($cdata, $restrictions, $limit = 0, $highlight = null)
 	    (isset($restrictions['teamid'])    ? 'AND s.teamid = %s '    : '%_') .
 	    (isset($restrictions['probid'])    ? 'AND s.probid = %s '    : '%_') .
 	    (isset($restrictions['langid'])    ? 'AND s.langid = %s '    : '%_') .
-	    (isset($restrictions['judgehost']) ? 'AND s.judgehost = %s ' : '%_') ;
+	    (isset($restrictions['judgehost']) ? 'AND s.judgehost = %s ' : '%_') .
+		(isset($restrictions['categoryid']) ? 'AND t.categoryid = %s ' : '%_') ;
 
 	$res = $DB->q('SELECT s.submitid, s.teamid, s.probid, s.langid,
 					s.submittime, s.judgehost, s.valid, t.name AS teamname,
@@ -107,7 +108,7 @@ function putSubmissions($cdata, $restrictions, $limit = 0, $highlight = null)
 				  . ($limit > 0 ? 'LIMIT 0, %i' : '%_')
 				, $cid, @$restrictions['teamid'], @$restrictions['probid']
 				, @$restrictions['langid'], @$restrictions['judgehost']
-				, $limit);
+				, @$restrictions['categoryid'], $limit);
 
 	// nothing found...
 	if( $res->count() == 0 ) {
@@ -258,28 +259,28 @@ function putSubmissions($cdata, $restrictions, $limit = 0, $highlight = null)
 		$subcnt = $DB->q('VALUE SELECT count(s.submitid) ' . $sqlbody
 					, $cid, @$restrictions['teamid'], @$restrictions['probid']
 					, @$restrictions['langid'], @$restrictions['judgehost']
-					);
+					, @$restrictions['categoryid']);
 		$corcnt = $DB->q('VALUE SELECT count(s.submitid) ' . $sqlbody
 						.' AND j.result like %s'
 					, $cid, @$restrictions['teamid'], @$restrictions['probid']
 					, @$restrictions['langid'], @$restrictions['judgehost']
-					, 'CORRECT'
+					, @$restrictions['categoryid'], 'CORRECT'
 					);
 		$igncnt = $DB->q('VALUE SELECT count(s.submitid) ' . $sqlbody
 						.' AND s.valid = 0'
 					, $cid, @$restrictions['teamid'], @$restrictions['probid']
 					, @$restrictions['langid'], @$restrictions['judgehost']
-					);
+					, @$restrictions['categoryid']);
 		$vercnt = $DB->q('VALUE SELECT count(s.submitid) ' . $sqlbody
 						.' AND verified = 0 AND result IS NOT NULL'
 					, $cid, @$restrictions['teamid'], @$restrictions['probid']
 					, @$restrictions['langid'], @$restrictions['judgehost']
-					);
+					, @$restrictions['categoryid']);
 		$quecnt = $DB->q('VALUE SELECT count(s.submitid) ' . $sqlbody
 						.' AND result IS NULL'
 					, $cid, @$restrictions['teamid'], @$restrictions['probid']
 					, @$restrictions['langid'], @$restrictions['judgehost']
-					);
+					, @$restrictions['categoryid']);
 		}
 		echo "<p>Total correct: $corcnt, submitted: $subcnt";
 		if($vercnt > 0)	echo ", unverified: $vercnt";
