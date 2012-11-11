@@ -2,6 +2,7 @@
    Libchecktestdata -- check testdata according to specification.
    Copyright (C) 2008-2012 Jan Kuipers
    Copyright (C) 2009-2012 Jaap Eldering (eldering@a-eskwadraat.nl).
+   Copyright (C) 2012 Tobias Werth (werth@cs.fau.de)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -33,8 +34,11 @@
 #include <cstdarg>
 #include <climits>
 #include <getopt.h>
+#include <sys/time.h>
+#include <cstdlib>
 #ifdef HAVE_BOOST_REGEX
 #include <boost/regex.hpp>
+#include <boost/lexical_cast.hpp>
 #else
 #error "Libboost regex library not available."
 #endif
@@ -50,7 +54,7 @@
 using namespace std;
 
 #define PROGRAM "checktestdata"
-#define AUTHORS "Jan Kuipers, Jaap Eldering"
+#define AUTHORS "Jan Kuipers, Jaap Eldering, Tobias Werth"
 #define VERSION DOMJUDGE_VERSION "/" REVISION
 
 enum value_type { value_none, value_int, value_flt };
@@ -70,6 +74,7 @@ struct value_t {
 
 class doesnt_match_exception {};
 class eof_found_exception {};
+class generate_exception {};
 
 ostream& operator <<(ostream &os, const value_t &val)
 {
@@ -86,15 +91,18 @@ const int display_after_error  = 50;
 size_t prognr, datanr, linenr, charnr, extra_ws;
 command currcmd;
 
+gmp_randclass gmp_rnd(gmp_randinit_default);
+
 string data;
 vector<command> program;
-map<string,value_t> variable;
+map<string,value_t> variable, preset;
 set<string> loop_cmds;
 // List of loop starting commands like REP, initialized in checksyntax.
 
 int whitespace_ok;
 int debugging;
 int quiet;
+int gendata;
 
 void debug(const char *, ...) __attribute__((format (printf, 1, 2)));
 
@@ -177,20 +185,25 @@ void readtestdata(istream &in)
 
 void error(string msg = string())
 {
+	if ( gendata ) {
+		cerr << "ERROR: in command " << currcmd << ": " << msg << endl << endl;
+		throw generate_exception();
+	}
+
 	size_t fr = max(0,int(datanr)-display_before_error);
 	size_t to = min(data.size(),datanr+display_after_error);
 
 	debug("error at datanr = %d, %d - %d\n",(int)datanr,(int)fr,(int)to);
 
 	if ( !quiet ) {
-		cout << data.substr(fr,datanr-fr) << endl;
-		cout << string(min(charnr,(size_t)display_before_error),' ') << '^';
-		cout << data.substr(datanr,to-datanr) << endl << endl;
+		cerr << data.substr(fr,datanr-fr) << endl;
+		cerr << string(min(charnr,(size_t)display_before_error),' ') << '^';
+		cerr << data.substr(datanr,to-datanr) << endl << endl;
 
-		cout << "ERROR: line " << linenr+1 << " character " << charnr+1;
-		cout << " of testdata doesn't match " << currcmd;
-		if ( msg.length()>0 ) cout << ": " << msg;
-		cout << endl << endl;
+		cerr << "ERROR: line " << linenr+1 << " character " << charnr+1;
+		cerr << " of testdata doesn't match " << currcmd;
+		if ( msg.length()>0 ) cerr << ": " << msg;
+		cerr << endl << endl;
 	}
 
 	throw doesnt_match_exception();
@@ -363,8 +376,16 @@ bool dotest(test t)
 	case '!': return !dotest(t.args[0]);
 	case '&': return dotest(t.args[0]) && dotest(t.args[1]);
 	case '|': return dotest(t.args[0]) || dotest(t.args[1]);
-	case 'E': return datanr>=data.size();
-	case 'M': return datanr<data.size() && t.args[0].val.find(data[datanr])!=string::npos;
+	case 'E': if ( gendata ) {
+			  return (rand() % 10 < 3);
+		  } else {
+			  return datanr>=data.size();
+		  }
+	case 'M': if ( gendata ) {
+			  return (rand() % 2 == 0);
+		  } else {
+			  return datanr<data.size() && t.args[0].val.find(data[datanr])!=string::npos;
+		  }
 	case '?': return compare(t.args);
 	default:
 		cerr << "unknown test " << t.op << " in " << program[prognr] << endl;
@@ -412,6 +433,242 @@ void checknewline()
 	// Leading whitespace after newline
 	if ( whitespace_ok ) readwhitespace();
 
+}
+
+#define MAX_MULT 10
+int getmult(string &exp, unsigned int &index)
+{
+	index++;
+
+	if (index >= exp.length()) {
+		return 1;
+	}
+
+	int min = 0;
+	int max = MAX_MULT;
+	switch (exp[index]) {
+	case '?':
+		index++;
+		max = 1;
+		break;
+	case '+':
+		index++;
+		min = 1;
+		break;
+	case '*':
+		index++;
+		break;
+	case '{':
+		index++;
+		{
+			int end = exp.find_first_of('}', index);
+			string minmaxs = exp.substr(index, end - index);
+			int pos = minmaxs.find_first_of(',');
+			if (pos == -1) {
+				min = max = boost::lexical_cast<int>(minmaxs);
+			} else {
+				string mins = minmaxs.substr(0, pos);
+				string maxs = minmaxs.substr(pos + 1);
+				min = boost::lexical_cast<int>(mins);
+				if (maxs.length() > 0) {
+					max = boost::lexical_cast<int>(maxs);
+				}
+			}
+			index = end + 1;
+		}
+		break;
+	default:
+		min = 1;
+		max = 1;
+	}
+
+	return (min + rand() % (1 + max - min));
+}
+
+void genregex(string exp, ostream &datastream)
+{
+	unsigned int i = 0;
+	while (i < exp.length()) {
+		switch (exp[i]) {
+		case '\\':
+			{
+				i++;
+				char c = exp[i];
+				int mult = getmult(exp, i);
+				for (int cnt = 0; cnt < mult; cnt++) {
+					datastream << c;
+				}
+			}
+			break;
+		case '.':
+			{
+				int mult = getmult(exp, i);
+				for (int cnt = 0; cnt < mult; cnt++) {
+					datastream << (char) (' ' + (rand() % (int) ('~' - ' ')));
+				}
+			}
+			break;
+		case '[':
+			{
+				set<char> possible;
+				bool escaped = false;
+				while (i + 1 < exp.length()) {
+					i++;
+					if (escaped) {
+						if (exp[i] == '\\') {
+							escaped = false;
+						}
+					} else if (exp[i] == ']') {
+						break;
+					} else if (exp[i] == '\\') {
+						escaped = true;
+						continue;
+					}
+					if (i + 2 < exp.length() && exp[i + 1] == '-') {
+						char from = exp[i];
+						i += 2;
+						char to = exp[i];
+						if (to == '\\') {
+							i++;
+							to = exp[i];
+						}
+						while (from <= to) {
+							possible.insert(from);
+							from++;
+						}
+					} else {
+						possible.insert(exp[i]);
+					}
+				}
+				vector<char> possibleVec;
+				copy(possible.begin(), possible.end(), std::back_inserter(possibleVec));
+				int mult = getmult(exp, i);
+				for (int cnt = 0; cnt < mult; cnt++) {
+					datastream << possibleVec[rand() % possibleVec.size()];
+				}
+			}
+			break;
+		case '(':
+			{
+				i++;
+				vector<string> alternatives;
+				int depth = 0;
+				int begin = i;
+				bool escaped = false;
+				while (depth > 0 || escaped || exp[i] != ')') {
+					if (exp[i] == '\\') {
+						escaped = !escaped;
+					} else if (depth == 0 && exp[i] == '|' && !escaped) {
+						alternatives.push_back(exp.substr(begin, i - begin));
+						begin = i + 1;
+					} else if (exp[i] == '(' && !escaped) {
+						depth++;
+					} else if (exp[i] == ')' && !escaped) {
+						depth--;
+					}
+					i++;
+				}
+				alternatives.push_back(exp.substr(begin, i - begin));
+				int mult = getmult(exp, i);
+				for (int cnt = 0; cnt < mult; cnt++) {
+					genregex(alternatives[rand() % alternatives.size()], datastream);
+				}
+			}
+			break;
+		default:
+			{
+				char c = exp[i];
+				int mult = getmult(exp, i);
+				for (int cnt = 0; cnt < mult; cnt++) {
+					datastream << c;
+				}
+			}
+			break;
+		}
+	}
+}
+
+void gentoken(command cmd, ostream &datastream)
+{
+	currcmd = cmd;
+	debug("generating token %s at %lu,%lu",
+	      cmd.name().c_str(),(unsigned long)linenr,(unsigned long)charnr);
+
+	if ( cmd.name()=="SPACE" ) datastream << ' ';
+
+	else if ( cmd.name()=="NEWLINE" ) datastream << '\n';
+
+	else if ( cmd.name()=="INT" ) {
+		mpz_class lo = eval(cmd.args[0]);
+		mpz_class hi = eval(cmd.args[1]);
+		mpz_class x(lo + gmp_rnd.get_z_range(hi - lo + 1));
+
+		if ( cmd.nargs()>=3 ) {
+			// Check if we have a preset value, then override the
+			// random generated value
+			if ( preset.count(cmd.args[2]) ) {
+				x = preset[cmd.args[2]];
+				if ( x<lo || x>hi ) {
+					error("preset value for '" + string(cmd.args[2]) + "' out of range");
+				}
+			}
+
+			variable[cmd.args[2]] = value_t(x);
+		}
+
+		datastream << x.get_str();
+	}
+
+	else if ( cmd.name()=="FLOAT" ) {
+		mpf_class lo = eval(cmd.args[0]);
+		mpf_class hi = eval(cmd.args[1]);
+
+		if ( cmd.nargs()>=4 ) {
+			if ( cmd.args[3].name()=="SCIENTIFIC" ) datastream << scientific;
+			else if ( cmd.args[3].name()=="FIXED" ) datastream << fixed;
+			else {
+				cerr << "invalid option in " << program[prognr] << endl;
+				exit(exit_failure);
+			}
+		}
+
+		mpf_class x(lo + gmp_rnd.get_f()*(hi-lo));
+
+		if ( cmd.nargs()>=3 ) {
+			// Check if we have a preset value, then override the
+			// random generated value
+			if ( preset.count(cmd.args[2]) ) {
+				x = preset[cmd.args[2]];
+				if ( x<lo || x>hi ) {
+					error("preset value for '" + string(cmd.args[2]) + "' out of range");
+				}
+			}
+
+			variable[cmd.args[2]] = value_t(x);
+		}
+
+		datastream << x;
+	}
+
+	else if ( cmd.name()=="STRING" ) {
+		string str = cmd.args[0];
+		datastream << str;
+	}
+
+	else if ( cmd.name()=="REGEX" ) {
+		string regex = cmd.args[0];
+		boost::regex e1(regex, boost::regex::extended); // this is only to check the expression
+		genregex(regex, datastream);
+	}
+
+	else if ( cmd.name()=="ASSERT" ) {
+		if ( !dotest(cmd.args[0]) ) error("assertion failed");
+	}
+
+	else {
+		cerr << "unknown command " << program[prognr] << endl;
+		exit(exit_failure);
+	}
 }
 
 void checktoken(command cmd)
@@ -641,22 +898,119 @@ void checktestdata()
 	}
 }
 
-bool checksyntax(istream &progstream, istream &datastream, int opt_mask) {
+void genrandomdata(ostream &datastream) {
+	while ( true ) {
+		command cmd = currcmd = program[prognr];
 
+		if ( cmd.name()=="EOF" ) {
+			debug("we are done ;-)");
+			return;
+		}
+
+		else if ( loop_cmds.count(cmd.name()) ) {
+			// Current and maximum loop iterations.
+			unsigned long i = 0, times = ULONG_MAX;
+
+			if ( cmd.name()=="REP" ) {
+				mpz_class n = eval(cmd.args[0]);
+				if ( !n.fits_ulong_p() ) {
+					cerr << "'" << n << "' does not fit in an unsigned long in "
+						 << program[prognr] << endl;
+					exit(exit_failure);
+				}
+				times = n.get_ui();
+			}
+
+			// Begin and end of loop commands
+			int loopbegin, loopend;
+
+			loopbegin = loopend = prognr + 1;
+
+			for(int looplevel=1; looplevel>0; ++loopend) {
+				string cmdstr = program[loopend].name();
+				if ( loop_cmds.count(cmdstr) || cmdstr=="IF") looplevel++;
+				if ( cmdstr=="END" ) looplevel--;
+			}
+
+			// Run loop...
+			debug("running %s loop, commands %d - %d, max. times = %ld",
+			      cmd.name().c_str(),loopbegin,loopend,times);
+
+			while ( (cmd.name()=="REP"   && i<times) ||
+			        (cmd.name()=="WHILE" && dotest(cmd.args[0])) ) {
+
+				debug("loop iteration %ld/%ld",i+1,times);
+				prognr = loopbegin;
+				if ( i>0 && cmd.nargs()>=2 ) gentoken(cmd.args[1], datastream);
+				genrandomdata(datastream);
+				i++;
+			}
+
+			// And skip to end of loop
+			prognr = loopend;
+		}
+
+		else if ( cmd.name()=="IF" ) {
+			// Find line numbers of matching else/end
+			int ifnr   = prognr;
+			int elsenr = -1;
+			int endnr  = prognr+1;
+
+			for(int looplevel=1; looplevel>0; ++endnr) {
+				string cmdstr = program[endnr].name();
+				if ( loop_cmds.count(cmdstr) || cmdstr=="IF") looplevel++;
+				if ( cmdstr=="END" ) looplevel--;
+				if ( cmdstr=="ELSE" && looplevel==1) elsenr = endnr;
+			}
+			endnr--;
+
+			debug("IF statement, if/else/end commands: %d/%d/%d",
+			      ifnr,elsenr,endnr);
+
+			// Test and execute correct command block
+			if (dotest(cmd.args[0])) {
+				debug("executing IF clause");
+				prognr = ifnr+1;
+				genrandomdata(datastream);
+			}
+			else if (elsenr!=-1) {
+				debug("executing ELSE clause");
+				prognr = elsenr+1;
+				genrandomdata(datastream);
+			}
+
+			prognr = endnr+1;
+		}
+
+		else if ( cmd.name()=="END" || cmd.name()=="ELSE" ) {
+			debug("scope closed by %s",cmd.name().c_str());
+			prognr++;
+			return;
+		}
+
+		else {
+			gentoken(cmd, datastream);
+			prognr++;
+		}
+	}
+}
+
+void init_checktestdata(std::istream &progstream, int opt_mask)
+{
 	// Output floats with high precision:
-	cout << setprecision(50);
-	cerr << setprecision(50);
+	cout << setprecision(10);
+	cerr << setprecision(10);
 	mpf_set_default_prec(256);
-
-	// Initialize block_cmds here, as a set cannot be initialized on
-	// declaration.
-	loop_cmds.insert("REP");
-	loop_cmds.insert("WHILE");
 
 	// Check the options bitmask
 	if (opt_mask & opt_whitespace_ok) whitespace_ok = 1;
 	if (opt_mask & opt_debugging    ) debugging = 1;
 	if (opt_mask & opt_quiet        ) quiet = 1;
+
+	// Initialize block_cmds here, as a set cannot be initialized on
+	// declaration.
+	loop_cmds.insert("REP");
+	loop_cmds.insert("WHILE");
 
 	// Read program and testdata
 	readprogram(progstream);
@@ -665,12 +1019,31 @@ bool checksyntax(istream &progstream, istream &datastream, int opt_mask) {
 		for(size_t i=0; i<program.size(); i++) cerr << program[i] << endl;
 	}
 
-	readtestdata(datastream);
+	// Initialize random generators
+	struct timeval time;
+	unsigned long seed;
+	gettimeofday(&time,NULL);
+	seed = (time.tv_sec * 1000) + (time.tv_usec % 1000);
+	srand(seed);
+	gmp_rnd.seed(seed);
 
-	// Check testdata
+	// Initialize current position in program and data.
 	linenr = charnr = 0;
 	datanr = prognr = 0;
 	extra_ws = 0;
+}
+
+void gentestdata(ostream &datastream)
+{
+	// Generate random testdata
+	gendata = 1;
+	genrandomdata(datastream);
+}
+
+bool checksyntax(istream &datastream)
+{
+	gendata = 0;
+	readtestdata(datastream);
 
 	// If we ignore whitespace, skip leading whitespace on first line
 	// as a special case; other lines are handled by checknewline().
@@ -683,6 +1056,38 @@ bool checksyntax(istream &progstream, istream &datastream, int opt_mask) {
 		return false;
 	}
 	catch (eof_found_exception) {}
+
+	return true;
+}
+
+bool parse_preset_list(std::string list)
+{
+	size_t pos = 0, sep1, sep2;
+	string name, val_str;
+	value_t value;
+
+	debug("parsing preset list '%s'", list.c_str());
+
+	while ( pos<list.length() ) {
+		if ( ( sep1=list.find('=', pos) )==string::npos ) return false;
+		if ( ( sep2=list.find(',', pos) )==string::npos ) sep2 = list.length();
+
+		name = list.substr(pos,sep1-pos);
+		val_str = list.substr(sep1+1,sep2-sep1-1);
+		debug("parsing preset '%s' = '%s'",name.c_str(),val_str.c_str());
+
+		try {
+			value = value_t(mpz_class(val_str));
+		} catch ( std::invalid_argument ) {
+			try {
+				value = value_t(mpf_class(val_str));
+			} catch ( ... ) { return false; }
+		} catch ( ... ) { return false; }
+
+		preset[name] = value;
+
+		pos = sep2 + 1;
+	}
 
 	return true;
 }
