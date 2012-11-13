@@ -29,7 +29,7 @@ TMP="$SOURCEDIR/$MAINCLASS"
 cp "$MAINSOURCE" $TMP.java
 
 # Byte-compile:
-javac $TMP.java
+javac -encoding UTF-8 $TMP.java
 EXITCODE=$?
 [ "$EXITCODE" -ne 0 ] && exit $EXITCODE
 

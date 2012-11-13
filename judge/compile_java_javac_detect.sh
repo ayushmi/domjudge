@@ -25,7 +25,7 @@ MEMRESERVED=450000
 TMPFILE=`mktemp /tmp/domjudge_javac_output.XXXXXX` || exit 1
 
 # Byte-compile:
-javac -d . "$@" 2> "$TMPFILE"
+javac -encoding UTF-8 -d . "$@" 2> "$TMPFILE"
 EXITCODE=$?
 if [ "$EXITCODE" -ne 0 ]; then
 	# Let's see if should have named the .java differently
