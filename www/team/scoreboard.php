@@ -24,4 +24,5 @@ require(LIBWWWDIR . '/header.php');
 // call the general putScoreBoard function from scoreboad.php
 putScoreBoard($cdata, $login, FALSE, $filter);
 
+require(LIBWWWDIR . '/sponsor.php');
 require(LIBWWWDIR . '/footer.php');

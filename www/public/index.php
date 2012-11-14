@@ -36,4 +36,5 @@ if ( ! $isstatic ) {
 // call the general putScoreBoard function from scoreboard.php
 putScoreBoard($cdata, null, $isstatic, $filter);
 
+require(LIBWWWDIR . '/sponsor.php');
 require(LIBWWWDIR . '/footer.php');
