@@ -25,8 +25,8 @@ setup_database_connection();
  * text on stdin. Examples below for notification by mail or prints.
  */
 //define('BALLOON_CMD', 'mail -s Balloon_notification domjudge@localhost');
-//define('BALLOON_CMD', 'lpr');
-define('BALLOON_CMD', '');
+define('BALLOON_CMD', 'lpr');
+//define('BALLOON_CMD', '');
 
 $verbose = LOG_INFO;
 
