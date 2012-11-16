@@ -42,7 +42,7 @@ define('LDAP_DNQUERY', 'CN=&,OU=users,DC=example,DC=com');
 
 // Specify here which of the users in htpasswd-jury should have admin 
 // rights on top of their jury rights
-$DOMJUDGE_ADMINS = array('domjudge_jury', 'admin');
+$DOMJUDGE_ADMINS = array('admin');
 
 // List of auto-detected language extensions by the submit client.
 //   Format: 'LANG,MAINEXT[,EXT]... [LANG...]' where:
@@ -51,4 +51,4 @@ $DOMJUDGE_ADMINS = array('domjudge_jury', 'admin');
 //   - EXT... are comma separated additional detected language extensions.
 // This list only needs to be modified when additional languages are
 // added and should be kept in sync with the list in submit-config.h.in.
-define('LANG_EXTS', 'C,c C++,cpp,cc Java,java Pascal,pas,p Haskell,hs,lhs Perl,pl POSIX-shell,sh C#,csharp,cs AWK,awk Python,py Bash,bash');
+define('LANG_EXTS', 'C,c C++,cpp,cc C++11,cxx Java,java Pascal,pas,p Haskell,hs,lhs Perl,pl POSIX-shell,sh C#,csharp,cs AWK,awk Python,py Bash,bash');
