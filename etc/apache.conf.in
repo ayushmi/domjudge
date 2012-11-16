@@ -43,8 +43,8 @@
 # want DOMjudge in the root, but only occupy a subdir, like this:
 # www.example.com/domjudge
 
-Alias /domjudge @domserver_wwwdir@
-
+#Alias /domjudge @domserver_wwwdir@
+DocumentRoot @domserver_wwwdir@
 
 ### General options ###
 #

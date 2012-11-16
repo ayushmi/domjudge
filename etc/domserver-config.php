@@ -22,7 +22,7 @@ require_once("common-config.php");
 //   can be useful e.g. for a demo or testing environment. Define
 //   FIXED_TEAM to the team user to be used, e.g.:
 //   define('FIXED_TEAM', 'domjudge');
-define('AUTH_METHOD', 'PHP_SESSIONS');
+define('AUTH_METHOD', 'IPADDRESS');
 
 // Strict checking of team's IP addresses (when using the IPADDRESS
 // authentication method).

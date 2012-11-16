@@ -45,6 +45,7 @@ INSERT INTO `judgehost` (`hostname`, `active`) VALUES ('sparehost', 0);
 
 INSERT INTO `language` (`langid`, `name`, `allow_submit`, `allow_judge`, `time_factor`) VALUES ('c', 'C', 1, 1, 1);
 INSERT INTO `language` (`langid`, `name`, `allow_submit`, `allow_judge`, `time_factor`) VALUES ('cpp', 'C++', 1, 1, 1);
+INSERT INTO `language` (`langid`, `name`, `allow_submit`, `allow_judge`, `time_factor`) VALUES ('cxx', 'C++11', 1, 1, 1);
 INSERT INTO `language` (`langid`, `name`, `allow_submit`, `allow_judge`, `time_factor`) VALUES ('java', 'Java', 1, 1, 1.5);
 INSERT INTO `language` (`langid`, `name`, `allow_submit`, `allow_judge`, `time_factor`) VALUES ('pas', 'Pascal', 0, 1, 1);
 INSERT INTO `language` (`langid`, `name`, `allow_submit`, `allow_judge`, `time_factor`) VALUES ('hs', 'Haskell', 0, 1, 2);
