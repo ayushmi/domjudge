@@ -17,7 +17,7 @@ MAINSOURCE="$1"
 # Amount of memory reserved for the Java virtual machine in kB. The
 # default below is just above the maximum memory usage of current
 # versions of the jvm, but might need increasing in some cases.
-MEMRESERVED=450000
+MEMRESERVED=900000
 
 # Oracle java needs filename to match main class:
 MAINCLASS=Main
