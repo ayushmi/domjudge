@@ -15,7 +15,7 @@
 set -e
 
 # Chroot subdirs needed: (add 'lib64' for amd64 architecture)
-SUBDIRMOUNTS="etc lib usr"
+SUBDIRMOUNTS="lib64 etc lib usr"
 
 # Location where to bind mount from:
 CHROOTORIGINAL="/chroot/domjudge"

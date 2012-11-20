@@ -25,7 +25,7 @@ ARCHLIST="amd64,armel,i386,ia64,mips,mipsel,powerpc,s390,sparc"
 INCLUDEDEBS=""
 
 # Debian packages to install after upgrade (space separated):
-INSTALLDEBS="openjdk-6-jre-headless"
+INSTALLDEBS="openjdk-7-jre-headless"
 # For C# support add: mono-runtime libmono-system2.0-cil
 # However running mono within chroot still gives errors...
 
@@ -102,7 +102,7 @@ fi
 
 echo "Running debootstrap to install base system, this may take a while..."
 /usr/sbin/debootstrap $INCLUDEOPT $EXCLUDEOPT \
-	--variant=minbase --arch "$ARCH" squeeze "$CHROOTDIR" "$DEBMIRROR"
+	--variant=minbase --arch "$ARCH" wheezy "$CHROOTDIR" "$DEBMIRROR"
 
 rm -f "$CHROOTDIR/etc/resolv.conf"
 cp /etc/resolv.conf /etc/hostname "$CHROOTDIR/etc" || true
@@ -111,8 +111,12 @@ cat > "$CHROOTDIR/etc/apt/sources.list" <<EOF
 # Different releases (incl. optional security repository):
 
 # Stable (squeeze)
-deb $DEBMIRROR			squeeze		main
-deb http://security.debian.org	squeeze/updates	main
+#deb $DEBMIRROR			squeeze		main
+#deb http://security.debian.org	squeeze/updates	main
+
+# Wheezy
+deb $DEBMIRROR			wheezy		main
+deb http://security.debian.org	wheezy/updates	main
 
 # Testing
 #deb $DEBMIRROR			testing		main
